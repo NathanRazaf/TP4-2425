@@ -358,6 +358,131 @@ void Fill_Pict(float** MatPts,float** MatPict,int PtsNumber,int NbPts)
 // FONCTIONS TPs----------------------------------                      
 //------------------------------------------------
       
+// Fonction pour calculer les dérivées du système d'équations différentielles
+void compute_derivatives(float t, float x, float y, float vx, float vy, float* dvx, float* dvy)
+{
+    float sum_x = 0;
+    float sum_y = 0;
+    float dist1, dist2, dist3;
+
+    // Calcul des distances au cube
+    dist1 = pow(sqrt(CARRE(X_1 - x) + CARRE(Y_1 - y) + CARRE(D)), 3);
+    dist2 = pow(sqrt(CARRE(X_2 - x) + CARRE(Y_2 - y) + CARRE(D)), 3);
+    dist3 = pow(sqrt(CARRE(X_3 - x) + CARRE(Y_3 - y) + CARRE(D)), 3);
+
+    // Somme des forces d'attraction des aimants
+    sum_x = (X_1 - x) / dist1 + (X_2 - x) / dist2 + (X_3 - x) / dist3;
+    sum_y = (Y_1 - y) / dist1 + (Y_2 - y) / dist2 + (Y_3 - y) / dist3;
+
+    // Calcul des dérivées secondes (accélérations)
+    *dvx = -R * vx + sum_x - C * x;
+    *dvy = -R * vy + sum_y - C * y;
+}
+
+// Implémentation de la méthode de Runge-Kutta Fehlberg
+void runge_kutta_fehlberg(float** MatPts, int nb_points)
+{
+    float t = T_0;
+    float x = X_1_INI;    // Position initiale en x
+    float y = X_3_INI;    // Position initiale en y
+    float vx = X_2_INI;   // Vitesse initiale en x
+    float vy = X_4_INI;   // Vitesse initiale en y
+
+    float k1_x, k1_y, k1_vx, k1_vy;
+    float k2_x, k2_y, k2_vx, k2_vy;
+    float k3_x, k3_y, k3_vx, k3_vy;
+    float k4_x, k4_y, k4_vx, k4_vy;
+    float k5_x, k5_y, k5_vx, k5_vy;
+    float k6_x, k6_y, k6_vx, k6_vy;
+
+    float dvx, dvy;
+
+    // Initialisation des statistiques
+    Xmin = Xmax = x;
+    Ymin = Ymax = y;
+
+    // Stocker la position initiale
+    MatPts[0][0] = x;
+    MatPts[0][1] = y;
+
+    // Boucle principale de la méthode RKF
+    for (int i = 1; i < nb_points; i++)
+    {
+        // Calcul de k1
+        k1_x = H * vx;
+        k1_y = H * vy;
+        compute_derivatives(t, x, y, vx, vy, &dvx, &dvy);
+        k1_vx = H * dvx;
+        k1_vy = H * dvy;
+
+        // Calcul de k2
+        k2_x = H * (vx + k1_vx/4);
+        k2_y = H * (vy + k1_vy/4);
+        compute_derivatives(t + H/4, x + k1_x/4, y + k1_y/4, vx + k1_vx/4, vy + k1_vy/4, &dvx, &dvy);
+        k2_vx = H * dvx;
+        k2_vy = H * dvy;
+
+        // Calcul de k3
+        k3_x = H * (vx + 3*k1_vx/32 + 9*k2_vx/32);
+        k3_y = H * (vy + 3*k1_vy/32 + 9*k2_vy/32);
+        compute_derivatives(t + 3*H/8, x + 3*k1_x/32 + 9*k2_x/32, y + 3*k1_y/32 + 9*k2_y/32,
+                         vx + 3*k1_vx/32 + 9*k2_vx/32, vy + 3*k1_vy/32 + 9*k2_vy/32, &dvx, &dvy);
+        k3_vx = H * dvx;
+        k3_vy = H * dvy;
+
+        // Calcul de k4
+        k4_x = H * (vx + 1932*k1_vx/2197 - 7200*k2_vx/2197 + 7296*k3_vx/2197);
+        k4_y = H * (vy + 1932*k1_vy/2197 - 7200*k2_vy/2197 + 7296*k3_vy/2197);
+        compute_derivatives(t + 12*H/13,
+                         x + 1932*k1_x/2197 - 7200*k2_x/2197 + 7296*k3_x/2197,
+                         y + 1932*k1_y/2197 - 7200*k2_y/2197 + 7296*k3_y/2197,
+                         vx + 1932*k1_vx/2197 - 7200*k2_vx/2197 + 7296*k3_vx/2197,
+                         vy + 1932*k1_vy/2197 - 7200*k2_vy/2197 + 7296*k3_vy/2197, &dvx, &dvy);
+        k4_vx = H * dvx;
+        k4_vy = H * dvy;
+
+        // Calcul de k5
+        k5_x = H * (vx + 439*k1_vx/216 - 8*k2_vx + 3680*k3_vx/513 - 845*k4_vx/4104);
+        k5_y = H * (vy + 439*k1_vy/216 - 8*k2_vy + 3680*k3_vy/513 - 845*k4_vy/4104);
+        compute_derivatives(t + H,
+                         x + 439*k1_x/216 - 8*k2_x + 3680*k3_x/513 - 845*k4_x/4104,
+                         y + 439*k1_y/216 - 8*k2_y + 3680*k3_y/513 - 845*k4_y/4104,
+                         vx + 439*k1_vx/216 - 8*k2_vx + 3680*k3_vx/513 - 845*k4_vx/4104,
+                         vy + 439*k1_vy/216 - 8*k2_vy + 3680*k3_vy/513 - 845*k4_vy/4104, &dvx, &dvy);
+        k5_vx = H * dvx;
+        k5_vy = H * dvy;
+
+        // Calcul de k6
+        k6_x = H * (vx - 8*k1_vx/27 + 2*k2_vx - 3544*k3_vx/2565 + 1859*k4_vx/4104 - 11*k5_vx/40);
+        k6_y = H * (vy - 8*k1_vy/27 + 2*k2_vy - 3544*k3_vy/2565 + 1859*k4_vy/4104 - 11*k5_vy/40);
+        compute_derivatives(t + H/2,
+                         x - 8*k1_x/27 + 2*k2_x - 3544*k3_x/2565 + 1859*k4_x/4104 - 11*k5_x/40,
+                         y - 8*k1_y/27 + 2*k2_y - 3544*k3_y/2565 + 1859*k4_y/4104 - 11*k5_y/40,
+                         vx - 8*k1_vx/27 + 2*k2_vx - 3544*k3_vx/2565 + 1859*k4_vx/4104 - 11*k5_vx/40,
+                         vy - 8*k1_vy/27 + 2*k2_vy - 3544*k3_vy/2565 + 1859*k4_vy/4104 - 11*k5_vy/40, &dvx, &dvy);
+        k6_vx = H * dvx;
+        k6_vy = H * dvy;
+
+        // Mise à jour des positions et vitesses
+        x = x + (16*k1_x/135 + 6656*k3_x/12825 + 28561*k4_x/56430 - 9*k5_x/50 + 2*k6_x/55);
+        y = y + (16*k1_y/135 + 6656*k3_y/12825 + 28561*k4_y/56430 - 9*k5_y/50 + 2*k6_y/55);
+        vx = vx + (16*k1_vx/135 + 6656*k3_vx/12825 + 28561*k4_vx/56430 - 9*k5_vx/50 + 2*k6_vx/55);
+        vy = vy + (16*k1_vy/135 + 6656*k3_vy/12825 + 28561*k4_vy/56430 - 9*k5_vy/50 + 2*k6_vy/55);
+
+        // Avancer le temps
+        t += H;
+
+        // Stocker les positions
+        MatPts[i][0] = x;
+        MatPts[i][1] = y;
+
+        // Mettre à jour les statistiques
+        if (x < Xmin) Xmin = x;
+        if (x > Xmax) Xmax = x;
+        if (y < Ymin) Ymin = y;
+        if (y > Ymax) Ymax = y;
+    }
+}
 
 //----------------------------------------------------------
 //----------------------------------------------------------
@@ -397,14 +522,8 @@ int main (int argc, char **argv)
   //par une courbe donné par l'équation d'en bas... et non pas par 
   //la solution de l'équation différentielle
  
-  for(k=0;k<(int)(NB_INTERV);k++)
-    { 
-      MatPts[k][0]=(k/(float)(NB_INTERV))*cos((k*0.0001)*3.14159); 
-      MatPts[k][1]=(k/(float)(NB_INTERV))*sin((k*0.001)*3.14159); 
-      //>on peut essayer la ligne d'en bas aussi
-      //MatPts[k][1]=(k/(float)(NB_INTERV))*sin((k*0.0001)*3.14159); 
-     }
-
+  // Appel de la fonction Runge-Kutta Fehlberg pour résoudre l'équation différentielle
+  runge_kutta_fehlberg(MatPts, (int)(NB_INTERV));
 
   //--Fin Question 1-----------------------------------------------------
 
